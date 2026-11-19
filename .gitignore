@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.env
+.venv/
+env/
+venv/
+
+# Temporary PPT backups
+*_backup.pptx
+
+# IDE
+.vscode/
+.idea/
