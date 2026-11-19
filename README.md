@@ -8,35 +8,74 @@
 
 ---
 
-## 📌 Project Overview
+## 📌 Project Overview: In Plain English & Technical Terms
 
-Medium Access Control (MAC) protocols such as **MACA** (*Multiple Access with Collision Avoidance*) and **MACAW** (*MACA for Wireless LANs*) govern channel contention in wireless networks using Request-to-Send / Clear-to-Send (RTS/CTS) handshakes and random backoff contention windows.
+### The Everyday Problem (Layman View)
+Imagine a crowded room where 50 people want to speak. If everyone starts talking at once, they talk over each other (**collision**). To avoid this:
+1. They raise their hands and ask permission before speaking (**RTS / CTS** in MACA).
+2. If two people ask at the exact same moment and collide, both must pause and wait a random moment before trying again (**Backoff**).
+3. If they wait too briefly, they collide immediately again. If they wait too long, there is dead silence and wasted time.
 
-Historically, backoff parameters (such as minimum contention window $CW_{min}$, maximum contention window $CW_{max}$, collision multiplicative growth factor $f$, and success decrease step $d$) were engineered using static heuristic rules (e.g., standard Binary Exponential Backoff). While these rules perform adequately in small networks, they lead to severe channel contention and high collision rates in congested, dense wireless networks.
+**The Problem:** Traditional networks used fixed waiting rules chosen by engineers in the 1990s. When only 3 nodes talk, the rules are fine. But when 50 nodes compete, up to **80% of attempts collide**, choking the channel.
 
-In this project, we formulate the contention window parameter selection as a continuous multi-objective optimization problem and employ **Particle Swarm Optimization (PSO)** to discover optimal backoff settings that maximize throughput and fairness while penalizing collision rates.
+### The Technical Formulation
+In wireless MAC protocols:
+- **MACA** (*Multiple Access with Collision Avoidance*) reserves the channel via RTS/CTS control frames.
+- **MACAW** (*MACA for Wireless LANs*) adds a link-layer acknowledgement (ACK) and a MILD (*Multiplicative Increase, Linear Decrease*) backoff algorithm.
+- Channel access contention is governed by 4 continuous parameters:
+  - $CW_{min}$: Minimum contention window (shortest pause after success).
+  - $CW_{max}$: Maximum contention window (upper limit cap after repeated collisions).
+  - $f$ (Growth Factor): Multiplier expanding the contention window upon a collision.
+  - $d$ (Decrease Step): Reduction applied to the contention window after a successful frame.
+
+We employ **Particle Swarm Optimization (PSO)** to discover the optimal parameter tuple $(CW_{min}, CW_{max}, f, d)$ that maximizes throughput and fairness while minimizing collisions.
+
+---
+
+## 🎯 The Fitness Function (How PSO Grades a Backoff Setting)
+
+The **Fitness Function** is the scoring rubric that PSO uses to grade every candidate backoff setting.
+
+$$\text{Fitness Score} = (\text{Throughput} \times \text{Fairness}) - (0.1 \times \text{CollisionRate})$$
+
+### 1. Throughput (Network Speed)
+- **Layman:** How much useful data actually gets delivered. Higher score = faster network.
+- **Technical:** Fraction of simulation time slots carrying successfully delivered payloads.
+
+### 2. Fairness (Equal Opportunity)
+- **Layman:** Does every node get a fair turn to speak, or does one aggressive node hijack the airwaves while others starve?
+- **Technical:** Jain's Fairness Index ($\mathcal{J} \in [0, 1]$), ensuring equal transmission distribution.
+  $$\mathcal{J} = \frac{\left(\sum_{i=1}^n x_i\right)^2}{n \sum_{i=1}^n x_i^2}$$
+
+### 3. Collisions (Wasted Retries)
+- **Layman:** How often packets crash into each other. Fewer crashes = less wasted energy and airtime.
+- **Technical:** Ratio of collision slots to total transmission attempts.
+
+### 💡 Why is the Fitness Function structured this way?
+1. **Why multiply $(\text{Throughput} \times \text{Fairness})$?**  
+   If we only maximized throughput, the optimizer could "cheat" by letting a single node transmit 100% of the time while 49 nodes starve. Multiplying by fairness guarantees the network must be **both fast and fair** to achieve a high score.
+2. **Why subtract $(0.1 \times \text{CollisionRate})$?**  
+   Acts as a gentle penalty discouraging reckless retries while keeping throughput delivery the primary goal.
 
 ---
 
 ## ⚙️ PSO Optimization Framework
 
-### 1. Objective Function (Fitness Score)
-$$\text{Score} = \text{Throughput} \times \text{Fairness} - 0.1 \times \text{CollisionRate}$$
+### Swarm Analogy
+Think of a flock of birds or bees searching for the richest flower patch. No individual bird knows the exact location, but by sharing their personal discoveries, the entire flock quickly converges on the richest feeding spot.
 
-- **Throughput:** Fraction of simulation slots carrying successful transmissions.
-- **Fairness:** Jain's Fairness Index across all active nodes:
-  $$\mathcal{J}(x) = \frac{\left(\sum_{i=1}^n x_i\right)^2}{n \sum_{i=1}^n x_i^2}$$
-- **Collision Penalty:** $0.1 \times \text{CollisionRate}$, ensuring throughput and fairness remain primary while discouraging excessive retries.
+### Mathematical Formulation
+Each particle updates its velocity $v$ and position $x$ across iterations:
+$$v_{t+1} = w \cdot v_t + c_1 r_1 (p_{best} - x_t) + c_2 r_2 (g_{best} - x_t)$$
+$$x_{t+1} = x_t + v_{t+1}$$
 
-### 2. PSO Hyperparameters
-- **Inertia Weight ($w$):** `0.7`
-- **Cognitive Parameter ($c_1$):** `1.5`
-- **Social Parameter ($c_2$):** `1.5`
-- **Stability Criterion:** $c_1 + c_2 = 3.0 < 3.5$, guaranteeing swarm convergence without divergence/explosion (Clerc & Kennedy, 2002; Poli, 2009).
-- **Swarm Size:** `16 particles`
-- **Iterations:** `18 iterations` ($16 \times 18 = 288$ evaluations per protocol)
-- **Training Network Sizes:** `[2, 8, 20, 40]` nodes
-- **Testing Network Sizes:** `[3, 5, 10, 20, 30, 50]` nodes (unseen validation)
+- **Inertia ($w = 0.7$):** Momentum keeping the particle moving in its current direction.
+- **Cognitive Weight ($c_1 = 1.5$):** Memory pulling the particle toward its own historical best.
+- **Social Weight ($c_2 = 1.5$):** Swarm wisdom pulling the particle toward the group's global best.
+- **Stability Condition:** $c_1 + c_2 = 3.0 < 3.5$, strictly satisfying Clerc & Kennedy's stability theorem to prevent swarm explosion/divergence.
+- **Search Budget:** 16 particles $\times$ 18 iterations = 288 full simulation evaluations per protocol.
+- **Training Set:** Networks of 2, 8, 20, and 40 nodes.
+- **Validation Set:** Unseen sizes (3, 5, 10, 20, 30, 50 nodes) across independent random seeds.
 
 ---
 
@@ -44,17 +83,17 @@ $$\text{Score} = \text{Throughput} \times \text{Fairness} - 0.1 \times \text{Col
 
 | Protocol | $CW_{min}$ | $CW_{max}$ | Growth Factor ($f$) | Shrink Step ($d$) |
 | :--- | :---: | :---: | :---: | :---: |
-| **Default (BEB)** | 4 | 32 | 2.00 | 1.00 |
+| **Default (Standard BEB)** | 4 | 32 | 2.00 | 1.00 |
 | **MACA (PSO-Tuned)** | **3** | **36** | **2.47** | **4.00** |
 | **MACAW (PSO-Tuned)** | **7** | **52** | **1.35** | **1.27** |
 
-> **Insight:** PSO identifies that congested wireless networks benefit from wider upper bounds ($CW_{max}$ expanded to 36 and 52) to disperse nodes after collisions. For MACAW, PSO chooses a gentler collision expansion factor ($1.35$ vs $2.00$) aligned with the MILD (Multiplicative Increase, Linear Decrease) design philosophy.
+> **Key Discovery:** In crowded environments, the default $CW_{max}=32$ is too cramped, forcing nodes to retry too close to each other. PSO widened $CW_{max}$ to 36 and 52, spreading out retry intervals. For MACAW, PSO selected a gentler growth factor ($1.35$ vs $2.00$), matching the MILD philosophy to avoid extreme channel latency.
 
 ---
 
 ## 📊 Experimental Results
 
-### 1. Performance at 50 Nodes (High Congestion)
+### 1. Performance at 50 Nodes (Heavy Congestion)
 
 | Metric | MACA Default | MACA PSO | Δ (Change) | MACAW Default | MACAW PSO | Δ (Change) |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
@@ -88,46 +127,41 @@ $$\text{Score} = \text{Throughput} \times \text{Fairness} - 0.1 \times \text{Col
 
 ## 📈 Visual Results
 
-All simulation graphs are automatically saved as `results.png` after execution:
+All simulation graphs are generated and exported automatically to `results.png`:
 
 ![Results Plot](results.png)
 
 ---
 
-## 🚀 How to Run
+## 🚀 How to Run the Code
 
 ### Prerequisites
 - Python 3.8+
 - NumPy
 - Matplotlib
 
-Install required packages:
+Install required libraries:
 ```bash
 pip install numpy matplotlib
 ```
 
 ### Execution
-Run the complete PSO optimization and evaluation pipeline:
+Run the full PSO optimization and evaluation script:
 ```bash
 python pso_maca_macaw.py
 ```
-
-The script will:
-1. Execute PSO optimization for MACA and MACAW (18 iterations with live progress).
-2. Evaluate default vs. PSO parameters on unseen node sizes across multiple random seeds.
-3. Print formatted comparison tables and summary metrics in the terminal.
-4. Export high-resolution comparison plots to `results.png`.
 
 ---
 
 ## 📁 Repository Structure
 ```
 .
-├── pso_maca_macaw.py      # Core simulation and PSO optimization pipeline
-├── NDO_final.pptx         # Presentation slides (with real data & charts)
-├── results.png            # Generated evaluation plots
-├── README.md              # Project documentation and summary
-└── .gitignore
+├── pso_maca_macaw.py          # Core simulation & PSO optimizer
+├── NDO_final.pptx             # Primary presentation slides (layman + technical)
+├── NDO_final_backup.pptx      # Original presentation backup
+├── results.png                # Generated performance plots
+├── README.md                  # Detailed documentation & explanation
+└── .gitignore                 # Git ignore rules
 ```
 
 ---
@@ -140,3 +174,4 @@ The script will:
 5. Bharghavan, V., Demers, A., Shenker, S., & Zhang, L. (1994). *MACAW: A media access protocol for wireless LANs*. ACM SIGCOMM Computer Communication Review, 24(4), 212-225.
 6. Karn, P. (1990). *MACA - a new channel access method for packet radio*. ARRL/CRRL Amateur Radio 9th Computer Networking Conference.
 7. Jain, R., Chiu, D. M., & Hawe, W. R. (1984). *A quantitative measure of fairness and discrimination for resource allocation in shared computer systems*. DEC Research Report TR-301.
+8. Hirapara, J., Khandelwal, D., & Meena, K. (2026). *PSO-Tuned MACA and MACAW Implementation*. GitHub Repository: https://github.com/JayH25/NDO---MACA-MACAw-with-PSO-optimization

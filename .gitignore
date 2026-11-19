@@ -7,8 +7,10 @@ __pycache__/
 env/
 venv/
 
-# Temporary PPT backups
-*_backup.pptx
+# Microsoft Office temporary lock files
+~$*.pptx
+~$*.docx
+~$*.xlsx
 
 # IDE
 .vscode/
