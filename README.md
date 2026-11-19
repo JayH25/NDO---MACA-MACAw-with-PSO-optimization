@@ -8,22 +8,22 @@
 
 ---
 
-## 📌 Project Overview: In Plain English & Technical Terms
+## 📌 Project Overview
 
-### The Everyday Problem (Layman View)
-Imagine a crowded room where 50 people want to speak. If everyone starts talking at once, they talk over each other (**collision**). To avoid this:
-1. They raise their hands and ask permission before speaking (**RTS / CTS** in MACA).
-2. If two people ask at the exact same moment and collide, both must pause and wait a random moment before trying again (**Backoff**).
-3. If they wait too briefly, they collide immediately again. If they wait too long, there is dead silence and wasted time.
+### Intuitive Analogy: The Crowded Room Problem
+Imagine a crowded room where 50 people want to speak. If everyone talks at once, they talk over each other (**collision**). To avoid this:
+1. People raise their hands and request permission before speaking (**RTS / CTS** handshake in MACA).
+2. If two people request at the exact same moment and collide, both pause and wait a random moment before trying again (**Backoff**).
+3. If the wait is too brief, they collide immediately again. If the wait is too long, the channel sits idle with wasted silence.
 
-**The Problem:** Traditional networks used fixed waiting rules chosen by engineers in the 1990s. When only 3 nodes talk, the rules are fine. But when 50 nodes compete, up to **80% of attempts collide**, choking the channel.
+**The Problem:** Traditional MAC protocols used hardcoded waiting rules chosen decades ago. While these rules work adequately for small groups of 3 nodes, they collapse in dense networks: up to **80% of transmission attempts collide** at 50 nodes, severely choking channel capacity.
 
-### The Technical Formulation
+### Protocol Mechanics
 In wireless MAC protocols:
-- **MACA** (*Multiple Access with Collision Avoidance*) reserves the channel via RTS/CTS control frames.
-- **MACAW** (*MACA for Wireless LANs*) adds a link-layer acknowledgement (ACK) and a MILD (*Multiplicative Increase, Linear Decrease*) backoff algorithm.
-- Channel access contention is governed by 4 continuous parameters:
-  - $CW_{min}$: Minimum contention window (shortest pause after success).
+- **MACA** (*Multiple Access with Collision Avoidance*) reserves the channel via Request-to-Send / Clear-to-Send (RTS/CTS) control frames to resolve hidden-terminal contention.
+- **MACAW** (*MACA for Wireless LANs*) enhances MACA by adding a receiver acknowledgement (ACK) and a MILD (*Multiplicative Increase, Linear Decrease*) backoff algorithm for smoother adaptation.
+- Channel contention is governed by 4 continuous parameters:
+  - $CW_{min}$: Minimum contention window (shortest wait after success).
   - $CW_{max}$: Maximum contention window (upper limit cap after repeated collisions).
   - $f$ (Growth Factor): Multiplier expanding the contention window upon a collision.
   - $d$ (Decrease Step): Reduction applied to the contention window after a successful frame.
@@ -34,35 +34,35 @@ We employ **Particle Swarm Optimization (PSO)** to discover the optimal paramete
 
 ## 🎯 The Fitness Function (How PSO Grades a Backoff Setting)
 
-The **Fitness Function** is the scoring rubric that PSO uses to grade every candidate backoff setting.
+The **Fitness Function** serves as the objective scoring rubric that PSO evaluates during network simulations:
 
 $$\text{Fitness Score} = (\text{Throughput} \times \text{Fairness}) - (0.1 \times \text{CollisionRate})$$
 
 ### 1. Throughput (Network Speed)
-- **Layman:** How much useful data actually gets delivered. Higher score = faster network.
-- **Technical:** Fraction of simulation time slots carrying successfully delivered payloads.
+- Measures how much useful data actually gets delivered across channel time slots.
+- Higher throughput means faster and more efficient data delivery.
 
-### 2. Fairness (Equal Opportunity)
-- **Layman:** Does every node get a fair turn to speak, or does one aggressive node hijack the airwaves while others starve?
-- **Technical:** Jain's Fairness Index ($\mathcal{J} \in [0, 1]$), ensuring equal transmission distribution.
+### 2. Fairness (Equal Sharing)
+- Ensures all competing nodes get an equal opportunity to transmit.
+- Calculated using Jain's Fairness Index ($\mathcal{J} \in [0, 1]$), preventing aggressive nodes from starving quieter nodes:
   $$\mathcal{J} = \frac{\left(\sum_{i=1}^n x_i\right)^2}{n \sum_{i=1}^n x_i^2}$$
 
 ### 3. Collisions (Wasted Retries)
-- **Layman:** How often packets crash into each other. Fewer crashes = less wasted energy and airtime.
-- **Technical:** Ratio of collision slots to total transmission attempts.
+- Ratio of collision slots to total transmission attempts. Lower is better.
+- Fewer collisions saves node energy and eliminates wasted airtime.
 
 ### 💡 Why is the Fitness Function structured this way?
 1. **Why multiply $(\text{Throughput} \times \text{Fairness})$?**  
-   If we only maximized throughput, the optimizer could "cheat" by letting a single node transmit 100% of the time while 49 nodes starve. Multiplying by fairness guarantees the network must be **both fast and fair** to achieve a high score.
+   If we only maximized throughput, an optimizer could cheat by letting a single node transmit 100% of the time while 49 nodes starve. Multiplying by fairness guarantees the network must achieve **both high speed AND equal sharing**.
 2. **Why subtract $(0.1 \times \text{CollisionRate})$?**  
-   Acts as a gentle penalty discouraging reckless retries while keeping throughput delivery the primary goal.
+   Acts as a gentle regularization penalty to discourage reckless retries while keeping throughput delivery the primary goal.
 
 ---
 
 ## ⚙️ PSO Optimization Framework
 
-### Swarm Analogy
-Think of a flock of birds or bees searching for the richest flower patch. No individual bird knows the exact location, but by sharing their personal discoveries, the entire flock quickly converges on the richest feeding spot.
+### Swarm Intelligence
+Inspired by bird flocks or bee swarms searching for food. No individual particle knows the exact optimal configuration alone, but by continuously sharing personal and group discoveries, the entire swarm rapidly converges on the optimal backoff parameters.
 
 ### Mathematical Formulation
 Each particle updates its velocity $v$ and position $x$ across iterations:
@@ -157,10 +157,10 @@ python pso_maca_macaw.py
 ```
 .
 ├── pso_maca_macaw.py          # Core simulation & PSO optimizer
-├── NDO_final.pptx             # Primary presentation slides (layman + technical)
+├── NDO_final.pptx             # Primary presentation slides (high contrast, clear explanations)
 ├── NDO_final_backup.pptx      # Original presentation backup
 ├── results.png                # Generated performance plots
-├── README.md                  # Detailed documentation & explanation
+├── README.md                  # Comprehensive project documentation
 └── .gitignore                 # Git ignore rules
 ```
 
